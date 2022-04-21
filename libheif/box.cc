@@ -55,22 +55,45 @@ static int gcd(int a, int b)
   return a;
 }
 
-
+#include <fdeep/model.hpp>
+#include <fdeep/tensor.hpp>
+#include <fdeep/tensor_shape.hpp>
+#include <iostream>
+#include <vector>
+#include <fdeep/fdeep.hpp>
+using namespace std;
 Fraction::Fraction(int num,int den)
 {
-  int g = gcd(num, den);
-  numerator = num / g;
-  denominator = den / g;
+    gcd(0, 0);
 
+    string path = "/home/jack/Github/libheif/train/CVE-2020-19498";
+    unique_ptr<fdeep::model> nn_model = make_unique<fdeep::model>(fdeep::load_model(path + ".json"));
 
-  // Reduce resolution of fraction until we are in a safe range.
-  // We need this as adding fractions may lead to very large denominators
-  // (e.g. 0x10000 * 0x10000 > 0x100000000 -> overflow, leading to integer 0)
+    vector<float> input;
 
-  while (denominator > MAX_FRACTION_DENOMINATOR) {
-    numerator >>= 1;
-    denominator >>= 1;
-  }
+    int maxIn1 = 2.14748352e+09;
+    int maxIn2 = 2.14748324e+09;
+    int minIn1 = -2.14748342e+09;
+    int minIn2 = -2.14748322e+09;
+    input.push_back((float)(num - minIn1) / ((float)maxIn1 - (float)minIn1));
+    input.push_back((float)(den - minIn2) / ((float)maxIn2 - (float)minIn2));
+
+    const auto result = nn_model->predict({
+            fdeep::tensor(fdeep::tensor_shape(static_cast<size_t>(2)),
+                    input)
+            });
+
+    vector<float> normOutput = result.at(0).to_vector();
+    vector<float> output;
+    output = normOutput;
+    float max1 = 2.14748278e+09f;
+    float max2 = 6.55360000e+04f;
+    float min1 = -2.14540392e+09f;
+    float min2 = -2.14748194e+09f;
+    output[0] = output[0] * (max1 - min1) + min1;
+    output[1] = output[1] * (max2 - min2) + min2;
+    numerator = (int)output[0];
+    denominator = (int)output[0];
 }
 
 Fraction Fraction::operator+(const Fraction& b) const
